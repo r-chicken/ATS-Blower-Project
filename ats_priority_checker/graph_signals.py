@@ -970,80 +970,86 @@ def read_spectrum_peak(chart_image: Image.Image) -> dict:
 
 
 def velocity_priority_hint(amp: float) -> int:
-    """Velocity (in/s) peak amplitude -> priority, PUMP EQUIPMENT ONLY.
-    >1.44 -> 1, 0.344-1.44 -> 2, 0.113-0.344 -> 3, <0.113 -> 4.
+    """Velocity (in/s) peak amplitude -> priority, BLOWER EQUIPMENT.
+    >1.25 -> 1, 0.525-1.25 -> 2, 0.2875-0.525 -> 3, <0.2875 -> 4.
 
-    Refit against the project owner's own hand-eyeballed amplitude
-    readings (a "peak amplitude (eyeball)" column, read directly off each
-    chart by a person - not this file's pixel-read
-    spectrum_peak_amplitude) for 88 pump reports (priority_raw: 51 P4, 16
-    P3, 17 P2, 4 P1), superseding an earlier fit against the pixel-read
-    amplitude on a larger (187-report) but noisier sample. Same
-    weighted-F1 grid search as before (every candidate boundary triple,
-    midpoints between consecutive distinct observed amplitudes, t1<t2<t3),
-    just against cleaner ground truth this time. Resulting accuracy: 75%
-    (n=88), Priority-1 recall 50% (2 of 4 - a genuinely thin sample, worth
-    re-checking once more Priority-1 pumps get eyeballed).
+    Replaces thresholds inherited unchanged from ATS-Pumps-Project when
+    this repo was forked from it. Those were fit against pump data and
+    explicitly documented there as "PUMP EQUIPMENT ONLY - do not ... apply
+    them to a mixed equipment set" - yet this repo's equipment is 100%
+    blowers, and spectrum_priority_hint (below) applied them to every
+    in/s reading unconditionally, with no equipment-kind check at all.
+    That's not a reading-quality problem, it's the wrong threshold set
+    entirely - these numbers are fit to this project's own data instead.
 
-    Kept to pumps deliberately: fan equipment has different amplitude
-    behavior than pumps (per the project owner) - do not port these
-    numbers to ATS-Fans-Project or apply them to a mixed equipment set.
+    Fit directly against this project's own pixel-read
+    spectrum_peak_amplitude vs. each report's stated priority_raw, for
+    338 blower reports (priority_raw: 204 P4, 79 P3, 42 P2, 13 P1). Same
+    weighted-F1 grid search ATS-Pumps-Project's velocity_priority_hint
+    used (every candidate boundary triple, midpoints between consecutive
+    distinct observed amplitudes, t1<t2<t3) - checked the top several
+    candidate triples directly; scores decline smoothly with no
+    degenerate-boundary tie. Resulting accuracy: 72.5% (n=338) vs. a
+    60.4% "always guess Priority 4" baseline; recall P1 46% (6 of 13),
+    P2 48% (20 of 42), P3 61% (48 of 79), P4 84% (171 of 204).
 
-    Hand-eyeballing the amplitudes did NOT resolve the underlying overlap
-    between priorities - confirmed directly on this data: "Thermal Fluid
-    HX Pmp" was stated Priority 1 (severe) at a hand-verified 0.219 in/s,
-    well inside where most Priority 4 (good) reports sit. Per the project
-    owner, this reflects real inconsistency in how priority gets assigned
-    to pump reports, not a reading-quality problem - so treat 75% as
-    close to the practical ceiling for a single-amplitude threshold rule
-    here, not a number a better fit would meaningfully beat.
+    Input note: fit against this project's spectrum_peak_amplitude as it
+    stood at fit time - floored to the nearest printed y-axis gridline,
+    from before the floored->continuous fix (see read_spectrum_peak's
+    docstring). Flooring only ever revises a reading DOWN, so these
+    boundaries are worth refitting once enough continuous-amplitude data
+    accumulates, rather than assumed to still be correct unchanged.
+
+    Same overlap problem seen in the pump data: report_289.pdf_p1 (DRO
+    Feed Table Blower) is stated Priority 1 at 0.075 in/s - well inside
+    where most Priority 4 reports sit - while report_413.pdf_p1 (EVOL1
+    Blower Under Feed Table) is stated Priority 4 at 0.95 in/s. Treat
+    72.5% as close to the practical ceiling for a single-amplitude
+    threshold rule here, not a number a better fit would meaningfully
+    beat.
     """
-    if amp > 1.44:
+    if amp > 1.25:
         return 1
-    if amp >= 0.344:
+    if amp >= 0.525:
         return 2
-    if amp >= 0.113:
+    if amp >= 0.2875:
         return 3
     return 4
 
 
 def acceleration_enveloping_priority_hint(amp: float) -> int:
-    """Acceleration enveloping (gE) peak amplitude -> priority, PUMP
-    EQUIPMENT ONLY. >1.28 -> 1, 0.179-1.28 -> 2, 0.048-0.179 -> 3,
-    <0.048 -> 4.
+    """Acceleration enveloping (gE) peak amplitude -> priority, BLOWER
+    EQUIPMENT. >0.925 -> 1, 0.275-0.925 -> 2, 0.17-0.275 -> 3, <0.17 -> 4.
 
-    Refit against the project owner's own hand-eyeballed amplitude
-    readings (a "peak amplitude (eyeball)" column, read directly off each
-    chart by a person - not this file's pixel-read
-    spectrum_peak_amplitude) for 122 pump reports (priority_raw: 25 P4, 25
-    P3, 61 P2, 11 P1), superseding an earlier fit against the pixel-read
-    amplitude on a larger (187-report) but noisier sample. Same
-    weighted-F1 grid search as velocity_priority_hint. Resulting accuracy:
-    54% (n=122), lower than the prior pixel-read fit's 58% but with better-
-    balanced recall across classes (Priority-1 recall 55%, 6 of 11, vs.
-    45% before) - the search here didn't hit the earlier fit's "P2/P1 near
-    20" degenerate-boundary problem (checked the top several candidates
-    directly; nothing near that shape showed up this time).
+    Replaces thresholds inherited unchanged from ATS-Pumps-Project - see
+    velocity_priority_hint's docstring for why applying pump-fit numbers
+    here was wrong, not just imprecise.
 
-    Kept to pumps deliberately: fan equipment has different amplitude
-    behavior than pumps (per the project owner) - do not port these
-    numbers to ATS-Fans-Project or apply them to a mixed equipment set.
+    Fit against this project's own pixel-read spectrum_peak_amplitude vs.
+    each report's stated priority_raw, for 122 blower reports
+    (priority_raw: 60 P4, 31 P2, 16 P1, 15 P3). Same weighted-F1 grid
+    search as velocity_priority_hint. Resulting accuracy: 54.9% (n=122)
+    vs. a 49.2% baseline - a much weaker fit than velocity's, the same
+    conclusion ATS-Pumps-Project's own gE fit reached; recall P1 19% (3 of
+    16), P2 45% (14 of 31), P3 27% (4 of 15), P4 77% (46 of 60).
 
-    Hand-eyeballing the amplitudes did NOT resolve the underlying overlap
-    between priorities - confirmed directly on this data: "Trailer Dump
-    Hyd Pump" was stated Priority 4 (good) at a hand-verified 0.626 gE, a
-    reading higher than the median Priority 1 or 2 report in this same
-    sample. Per the project owner, this reflects real inconsistency in how
-    priority gets assigned to pump reports, not a reading-quality problem
-    - so treat 54% as close to the practical ceiling for a single-
-    amplitude threshold rule here, not a number a better fit would
-    meaningfully beat.
+    Input note: same floored-not-continuous caveat as
+    velocity_priority_hint - worth refitting once continuous-amplitude gE
+    data accumulates.
+
+    Overlap here is severe, not just present: report_059.pdf_p1 (S/F2
+    Blower) is stated Priority 4 (good) at 2.5 gE - the single highest gE
+    reading in the entire dataset - while report_481.pdf_p1 (Transfer
+    Belt Blower) is stated Priority 1 (severe) at 0.08 gE. Priority isn't
+    cleanly separable by gE amplitude alone in this data - treat 54.9% as
+    close to the practical ceiling for a single-amplitude threshold rule
+    here, not a number a better fit would meaningfully beat.
     """
-    if amp > 1.28:
+    if amp > 0.925:
         return 1
-    if amp >= 0.179:
+    if amp >= 0.275:
         return 2
-    if amp >= 0.048:
+    if amp >= 0.17:
         return 3
     return 4
 
